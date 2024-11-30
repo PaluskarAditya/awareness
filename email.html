@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Email Details</title>
+  <script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"
+    crossorigin="anonymous">
+</head>
+
+<body class="p-2">
+  <h1>Email Details</h1>
+  <div id="emailDetails" class="container-fluid mt-4"></div>
+
+  <script>
+    const socket = io('http://localhost:8080');
+
+    // Function to fetch query parameter (email index)
+    function getQueryParam(param) {
+      const urlParams = new URLSearchParams(window.location.search);
+      return urlParams.get(param);
+    }
+
+    const emailIndex = getQueryParam('index');
+
+    // Function to render email details with phishing buttons
+    function renderEmailDetails(email) {
+      const emailDetails = document.getElementById('emailDetails');
+
+      emailDetails.innerHTML = 
+        <div class="card">
+          <div class="card-header">
+            <strong>Subject:</strong> ${email.subject}
+          </div>
+          <div class="card-body">
+            <h5 class="card-title">From: Admin</h5>
+            <p class="card-text">${email.body}</p>
+            <p class="card-text text-muted"><small>Sent: ${new Date(email.timestamp).toLocaleString()}</small></p>
+          </div>
+          <div id="responseSection" class="card-footer">
+            <p class="text-info">Please indicate if this email is phishing or not and provide your reasoning:</p>
+            <textarea id="reasonInput" class="form-control mb-2" placeholder="Reason for your selection"></textarea>
+            <button id="phishingButton" class="btn btn-danger btn-sm me-2">Mark as Phishing</button>
+            <button id="notPhishingButton" class="btn btn-success btn-sm">Mark as Not Phishing</button>
+          </div>
+        </div>
+      ;
+
+      // Event listeners for the buttons
+      document.getElementById('phishingButton').addEventListener('click', () => handleResponse(emailIndex, 'Phishing'));
+      document.getElementById('notPhishingButton').addEventListener('click', () => handleResponse(emailIndex, 'Not Phishing'));
+    }
+
+    // Function to render the user's response
+    function renderResponse(response, reason) {
+      const responseSection = document.getElementById('responseSection');
+      responseSection.innerHTML = 
+        `<p class="text-success"><strong>Response:</strong> ${response}</p>
+        <p><strong>Reason:</strong> ${reason}</p>`
+      ;
+    }
+
+    // Function to handle phishing response
+    function handleResponse(index, response) {
+      const reasonInput = document.getElementById('reasonInput').value.trim();
+
+      if (!reasonInput) {
+        alert('Please provide a reason for your selection.');
+        return;
+      }
+
+      // Emit the response back to the server
+      socket.emit('email_response', { index, response, reason: reasonInput });
+
+      // Update the UI to show the response and remove buttons
+      renderResponse(response, reasonInput);
+    }
+
+    // Load email details based on index
+    socket.on('load_inbox', (emails) => {
+      if (emails[emailIndex]) {
+        renderEmailDetails(emails[emailIndex]);
+      } else {
+        document.getElementById('emailDetails').innerHTML = <p class="text-danger">Email not found!</p>;
+      }
+    });
+
+    // Request inbox data to load the specific email
+    socket.emit('request_inbox');
+  </script>
+</body>
+
+</html>
