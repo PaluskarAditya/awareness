@@ -15,9 +15,10 @@ const io = new Server(server, {
 app.use(express.json());
 app.use(cors());
 
-let clientInbox = []; // Stores emails
 let emailTemplates = []; // Stores email templates
 let connectedUsers = {}; // Tracks connected users
+let campaigns = []; // Store campaigns
+let userInbox = {}; // Store emails for each user
 
 // Handle Socket.IO connections
 io.on('connection', (socket) => {
@@ -26,39 +27,53 @@ io.on('connection', (socket) => {
     // Add connected user
     connectedUsers[socket.id] = { id: socket.id, name: `User-${socket.id.slice(0, 5)}` };
 
-    // Notify clients about connected users
-    io.emit('update_connected_users', Object.values(connectedUsers));
-
-    // Send the current inbox to the client
-    socket.emit('load_inbox', clientInbox);
+    // Send the current email templates to the client
     socket.emit('update_email_templates', emailTemplates);
 
-    // Handle sending a new email
-    socket.on('send_email', (email) => {
-        email.timestamp = Date.now();
-        email.response = null; // Initially no response
-        clientInbox.push(email);
-        io.emit('load_inbox', clientInbox); // Broadcast updated inbox
-    });
-
-    // Handle email response
-    socket.on('email_response', ({ index, response, reason }) => {
-        if (clientInbox[index]) {
-            const email = clientInbox[index];
-            email.response = { status: response, reason, timestamp: Date.now() };
-            console.log(`Email #${index} marked as ${response}: ${reason}`);
-
-            // Broadcast updated inbox to all clients
-            io.emit('load_inbox', clientInbox);
-        } else {
-            console.error(`Email with index ${index} not found.`);
-        }
+    // Send inbox to the user
+    socket.on('request_inbox', () => {
+        const inbox = userInbox[socket.id] || [];
+        socket.emit('update_inbox', inbox);
     });
 
     // Handle creating a new email template
     socket.on('create_email_template', (template) => {
         emailTemplates.push(template);
         io.emit('update_email_templates', emailTemplates); // Broadcast updated templates to all clients
+    });
+
+    // Handle creating a new campaign
+    socket.on('create_campaign', (campaign) => {
+        // Prevent sending the same campaign twice
+        const existingCampaign = campaigns.find(existingCampaign => existingCampaign.name === campaign.name && existingCampaign.status === 'scheduled');
+        if (existingCampaign) return; // Prevent double sending of the same campaign
+
+        campaigns.push(campaign);
+
+        // Send the email to selected users or all users
+        if (campaign.recipient === 'all') {
+            Object.keys(connectedUsers).forEach((userId) => {
+                if (!userInbox[userId]) userInbox[userId] = []; // Initialize inbox if it doesn't exist for the user
+                userInbox[userId].push({
+                    subject: campaign.name,
+                    body: campaign.template.content,
+                    timestamp: new Date().toISOString(),
+                });
+                io.to(userId).emit('update_inbox', userInbox[userId]);
+            });
+        } else {
+            const recipientId = Object.keys(connectedUsers).find(userId => connectedUsers[userId].name === campaign.recipient);
+            if (!userInbox[recipientId]) userInbox[recipientId] = []; // Initialize inbox for the recipient
+            userInbox[recipientId].push({
+                subject: campaign.name,
+                body: campaign.template.content,
+                timestamp: new Date().toISOString(),
+            });
+            io.to(recipientId).emit('update_inbox', userInbox[recipientId]);
+        }
+
+        // Notify all connected clients about the new campaign
+        io.emit('update_campaigns', campaigns);
     });
 
     // Handle disconnect
@@ -69,9 +84,7 @@ io.on('connection', (socket) => {
     });
 });
 
-// Serve static files
-app.use(express.static('public'));
-
+// Start the server
 server.listen(8080, () => {
-    console.log('Server running at http://localhost:8080');
+    console.log('Server started on http://localhost:8080');
 });

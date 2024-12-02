@@ -27,16 +27,17 @@
 
     // Function to render email details with phishing buttons
     function renderEmailDetails(email) {
+      console.log(email);
       const emailDetails = document.getElementById('emailDetails');
 
-      emailDetails.innerHTML = 
+      emailDetails.innerHTML = `
         <div class="card">
           <div class="card-header">
             <strong>Subject:</strong> ${email.subject}
           </div>
           <div class="card-body">
             <h5 class="card-title">From: Admin</h5>
-            <p class="card-text">${email.body}</p>
+            <p class="card-text">${email.content}</p>
             <p class="card-text text-muted"><small>Sent: ${new Date(email.timestamp).toLocaleString()}</small></p>
           </div>
           <div id="responseSection" class="card-footer">
@@ -46,24 +47,28 @@
             <button id="notPhishingButton" class="btn btn-success btn-sm">Mark as Not Phishing</button>
           </div>
         </div>
-      ;
+      `;
 
       // Event listeners for the buttons
-      document.getElementById('phishingButton').addEventListener('click', () => handleResponse(emailIndex, 'Phishing'));
-      document.getElementById('notPhishingButton').addEventListener('click', () => handleResponse(emailIndex, 'Not Phishing'));
+      document.getElementById('phishingButton').addEventListener('click', () => handleResponse(email, 'Phishing'));
+      document.getElementById('notPhishingButton').addEventListener('click', () => handleResponse(email, 'Not Phishing'));
     }
 
     // Function to render the user's response
     function renderResponse(response, reason) {
       const responseSection = document.getElementById('responseSection');
-      responseSection.innerHTML = 
-        `<p class="text-success"><strong>Response:</strong> ${response}</p>
-        <p><strong>Reason:</strong> ${reason}</p>`
-      ;
+      responseSection.innerHTML = `
+        <p class="text-success"><strong>Response:</strong> ${response}</p>
+        <p><strong>Reason:</strong> ${reason}</p>
+      `;
+
+      // Disable buttons after selection
+      document.getElementById('phishingButton').disabled = true;
+      document.getElementById('notPhishingButton').disabled = true;
     }
 
     // Function to handle phishing response
-    function handleResponse(index, response) {
+    function handleResponse(email, response) {
       const reasonInput = document.getElementById('reasonInput').value.trim();
 
       if (!reasonInput) {
@@ -71,8 +76,8 @@
         return;
       }
 
-      // Emit the response back to the server
-      socket.emit('email_response', { index, response, reason: reasonInput });
+      // Emit the response back to the server with the email index, response, and reason
+      socket.emit('email_response', { index: email.index, response, reason: reasonInput });
 
       // Update the UI to show the response and remove buttons
       renderResponse(response, reasonInput);
@@ -83,7 +88,7 @@
       if (emails[emailIndex]) {
         renderEmailDetails(emails[emailIndex]);
       } else {
-        document.getElementById('emailDetails').innerHTML = <p class="text-danger">Email not found!</p>;
+        document.getElementById('emailDetails').innerHTML = `<p class="text-danger">Email not found!</p>`;
       }
     });
 

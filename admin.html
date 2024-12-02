@@ -6,14 +6,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Admin Panel</title>
     <script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"
-        crossorigin="anonymous">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" crossorigin="anonymous">
 </head>
 
 <body class="p-2">
     <h1>Admin Panel</h1>
 
-    <!-- Campaign Table -->
     <h3>Campaigns</h3>
     <table id="campaignTable" class="table table-bordered">
         <thead>
@@ -22,122 +20,170 @@
                 <th>Description</th>
                 <th>Start Date</th>
                 <th>End Date</th>
+                <th>Status</th>
                 <th>Action</th>
             </tr>
         </thead>
         <tbody></tbody>
     </table>
 
-    <!-- Form to send an email -->
-    <div class="mb-4">
-        <h3>Send Email</h3>
-        <form id="sendEmailForm" class="d-flex gap-2">
-            <input type="text" id="emailSubject" class="form-control" placeholder="Subject" required />
-            <select id="templateSelector" class="form-select" required>
-                <option value="">Select Email Template</option>
-            </select>
-            <select id="recipientSelector" class="form-select" required>
-                <option value="all">All Users</option>
-            </select>
-            <button type="submit" class="btn btn-success">Send</button>
-        </form>
-    </div>
-
-    <!-- Form to create a new email template -->
     <div class="mt-4">
-        <h3>Create Email Template</h3>
-        <form id="createTemplateForm" class="d-flex gap-2">
-            <input type="text" id="templateName" class="form-control" placeholder="Template Name" required />
-            <input type="text" id="templateDescription" class="form-control" placeholder="Template Description"
-                required />
-            <textarea id="templateBody" class="form-control" placeholder="Template Body" required></textarea>
-            <button type="submit" class="btn btn-primary">Create Template</button>
+        <h3>Create New Campaign</h3>
+        <form id="createCampaignForm" class="row g-3">
+            <div class="col-md-4">
+                <input type="text" id="campaignName" class="form-control" placeholder="Campaign Name" required />
+            </div>
+            <div class="col-md-2">
+                <select id="recipientSelector" class="form-select" required>
+                    <option value="all">All Users</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <select id="categorySelector" class="form-select" required>
+                    <option value="phishing">Phishing</option>
+                    <option value="malware">Malware</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <select id="templateSelector" class="form-select" required>
+                    <option value="">Select Email Template</option>
+                </select>
+            </div>
+
+            <div class="col-md-2">
+                <input type="date" id="startDate" class="form-control" required />
+            </div>
+            <div class="col-md-2">
+                <input type="time" id="startTime" class="form-control" required />
+            </div>
+
+            <div class="col-12 text-center">
+                <button type="submit" class="btn btn-primary">Create Campaign</button>
+            </div>
         </form>
     </div>
 
-    <!-- Display email templates -->
     <div class="mt-4">
         <h3>Available Email Templates</h3>
         <div id="emailTemplates" class="row gap-3 p-3"></div>
     </div>
 
+    <div class="mt-4">
+        <h3>Create New Email Template</h3>
+        <form id="createEmailTemplateForm" class="d-flex flex-column gap-2">
+            <input type="text" id="templateName" class="form-control" placeholder="Template Name" required />
+            <textarea id="templateDescription" class="form-control" placeholder="Template Description" required></textarea>
+            <select id="templateCategory" class="form-select" required>
+                <option value="phishing">Phishing</option>
+                <option value="malware">Malware</option>
+            </select>
+            <textarea id="templateContent" class="form-control" placeholder="Template Content" required></textarea>
+            <button type="submit" class="btn btn-primary">Create Template</button>
+        </form>
+    </div>
+
     <script>
         const socket = io('http://localhost:8080');
+        let emailTemplates = [];
+        let campaigns = [];
 
-        // Populate the recipient dropdown with connected users
-        socket.on('update_connected_users', (users) => {
-            const recipientSelector = document.getElementById('recipientSelector');
-            recipientSelector.innerHTML = '<option value="all">All Users</option>';
-
-            users.forEach((user) => {
-                const option = document.createElement('option');
-                option.value = user.name; // Use user name as identifier
-                option.textContent = user.name;
-                recipientSelector.appendChild(option);
-            });
-        });
-
-        // Send email
-        document.getElementById('sendEmailForm').addEventListener('submit', (e) => {
-            e.preventDefault();
-
-            const recipient = document.getElementById('recipientSelector').value;
-            const subject = document.getElementById('emailSubject').value;
-            const selectedTemplate = JSON.parse(document.getElementById('templateSelector').value);
-
-            const emailData = {
-                recipient,
-                subject,
-                template: selectedTemplate, // Use only the template
-            };
-
-            socket.emit('send_email', emailData);
-
-            // Reset form
-            e.target.reset();
-        });
-
-        // Display email templates
-        socket.on('update_email_templates', (templates) => {
+        function displayEmailTemplates(templates) {
+            const emailTemplatesContainer = document.getElementById('emailTemplates');
             const templateSelector = document.getElementById('templateSelector');
-            templateSelector.innerHTML = '<option value="">Select Email Template</option>';
+            emailTemplatesContainer.innerHTML = '';
+            templateSelector.innerHTML = '<option value="">Select Email Template</option>'; // Reset the template dropdown
 
-            const templateContainer = document.getElementById('emailTemplates');
-            templateContainer.innerHTML = ''; // Clear previous templates
-
-            templates.forEach((template) => {
-                // Populate the dropdown
+            templates.forEach(template => {
+                // Add the template to the dropdown
                 const option = document.createElement('option');
-                option.value = JSON.stringify(template);
+                option.value = template.name;
                 option.textContent = template.name;
                 templateSelector.appendChild(option);
 
-                // Display as a card
-                const card = document.createElement('div');
-                card.className = 'col-md-3 card p-3 shadow-sm';
-                card.innerHTML =
-                    `<h5 class="card-title">${template.name}</h5>
-                    <p class="card-text text-muted">${template.description}</p>`
-                ;
-                templateContainer.appendChild(card);
+                // Also display it in the list of templates
+                const templateCard = document.createElement('div');
+                templateCard.classList.add('col-md-4', 'card', 'p-3');
+                templateCard.innerHTML = `
+                    <h5 class="card-title">${template.name}</h5>
+                    <p class="card-text">${template.description}</p>
+                    <button class="btn btn-info"
+                `;
+                emailTemplatesContainer.appendChild(templateCard);
             });
+        }
+
+        function displayCampaigns(campaigns) {
+            const campaignTableBody = document.querySelector('#campaignTable tbody');
+            campaignTableBody.innerHTML = '';
+            campaigns.forEach(campaign => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${campaign.name}</td>
+                    <td>${campaign.description}</td>
+                    <td>${campaign.startDate}</td>
+                    <td>${campaign.endDate}</td>
+                    <td>${campaign.status}</td>
+                    <td><button class="btn btn-success">Send</button></td>
+                `;
+                campaignTableBody.appendChild(row);
+            });
+        }
+
+        socket.on('update_email_templates', (templates) => {
+            emailTemplates = templates;
+            displayEmailTemplates(templates);
         });
 
-        // Create a new email template
-        document.getElementById('createTemplateForm').addEventListener('submit', (e) => {
-            e.preventDefault();
+        socket.on('update_campaigns', (newCampaigns) => {
+            campaigns = newCampaigns;
+            displayCampaigns(newCampaigns);
+        });
 
+        document.getElementById('createEmailTemplateForm').addEventListener('submit', (e) => {
+            e.preventDefault();
             const name = document.getElementById('templateName').value;
             const description = document.getElementById('templateDescription').value;
-            const body = document.getElementById('templateBody').value;
+            const category = document.getElementById('templateCategory').value;
+            const content = document.getElementById('templateContent').value;
 
-            const newTemplate = { name, description, body };
-            socket.emit('create_email_template', newTemplate);
-
-            // Reset form
-            e.target.reset();
+            socket.emit('create_email_template', {
+                name,
+                description,
+                category,
+                content
+            });
+            document.getElementById('createEmailTemplateForm').reset();
         });
 
+        document.getElementById('createCampaignForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const name = document.getElementById('campaignName').value;
+            const recipient = document.getElementById('recipientSelector').value;
+            const selectedTemplateName = document.getElementById('templateSelector').value;
+            const template = emailTemplates.find(t => t.name === selectedTemplateName);
+            const startDate = document.getElementById('startDate').value;
+            const startTime = document.getElementById('startTime').value;
+
+            if (!template) {
+                alert("Please select a template.");
+                return;
+            }
+
+            socket.emit('create_campaign', {
+                name,
+                recipient,
+                template,
+                startDate,
+                startTime,
+                status: 'scheduled'
+            });
+
+            document.getElementById('createCampaignForm').reset();
+        });
+
+        function selectTemplate(templateName) {
+            document.getElementById('templateSelector').value = templateName;
+        }
     </script>
 </body>
 
