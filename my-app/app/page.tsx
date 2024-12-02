@@ -1,10 +1,10 @@
 import React from 'react';
-import Inbox from './components/Inbox';
+import Home from './components/Home';
 
 export default function page() {
   return (
-    <div className='p-3 w-full'>
-      <Inbox />
+    <div className='w-full'>
+      <Home />
     </div>
   )
 }

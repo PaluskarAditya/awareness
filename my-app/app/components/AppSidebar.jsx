@@ -1,4 +1,4 @@
-import { Calendar, Home, Inbox, InboxIcon, LogOutIcon, Search, Settings, SettingsIcon, UserCircle } from "lucide-react"
+import { Book, Calendar, Home, Inbox, InboxIcon, LogOutIcon, Search, Settings, SettingsIcon, UserCircle } from "lucide-react"
 
 import {
   Sidebar,
@@ -25,7 +25,7 @@ const items = [
   },
   {
     title: "Inbox",
-    url: "/",
+    url: "/inbox",
     icon: InboxIcon,
   },
   {
@@ -38,6 +38,11 @@ const items = [
     url: "/",
     icon: UserCircle,
   },
+  {
+    title: "Courses & Videos",
+    url: "/edu",
+    icon: Book
+  }
 
 ]
 
@@ -65,15 +70,15 @@ export default function AppSidebar() {
       </SidebarContent>
       <SidebarFooter className="flex justify-center items-start">
         <SidebarMenu className="flex">
+          <SidebarMenuItem className="w-full">
+            <SidebarMenuButton variant={"outline"} asChild className="w-full">
+              <ModeToggle />
+            </SidebarMenuButton>
+          </SidebarMenuItem>
           <SidebarMenuItem>
             <SidebarMenuButton variant={"outline"}>
               <LogOutIcon />
               <span>Logout</span>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-          <SidebarMenuItem>
-            <SidebarMenuButton variant={"outline"} asChild>
-              <ModeToggle />
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>

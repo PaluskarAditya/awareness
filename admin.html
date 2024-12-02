@@ -6,7 +6,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Admin Panel</title>
     <script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" crossorigin="anonymous">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"
+        crossorigin="anonymous">
 </head>
 
 <body class="p-2">
@@ -72,7 +73,8 @@
         <h3>Create New Email Template</h3>
         <form id="createEmailTemplateForm" class="d-flex flex-column gap-2">
             <input type="text" id="templateName" class="form-control" placeholder="Template Name" required />
-            <textarea id="templateDescription" class="form-control" placeholder="Template Description" required></textarea>
+            <textarea id="templateDescription" class="form-control" placeholder="Template Description"
+                required></textarea>
             <select id="templateCategory" class="form-select" required>
                 <option value="phishing">Phishing</option>
                 <option value="malware">Malware</option>
@@ -87,48 +89,51 @@
         let emailTemplates = [];
         let campaigns = [];
 
+        // Render email templates
         function displayEmailTemplates(templates) {
             const emailTemplatesContainer = document.getElementById('emailTemplates');
             const templateSelector = document.getElementById('templateSelector');
             emailTemplatesContainer.innerHTML = '';
-            templateSelector.innerHTML = '<option value="">Select Email Template</option>'; // Reset the template dropdown
+            templateSelector.innerHTML = '<option value="">Select Email Template</option>';
 
             templates.forEach(template => {
-                // Add the template to the dropdown
+                // Add to dropdown
                 const option = document.createElement('option');
                 option.value = template.name;
                 option.textContent = template.name;
                 templateSelector.appendChild(option);
 
-                // Also display it in the list of templates
+                // Display in list
                 const templateCard = document.createElement('div');
                 templateCard.classList.add('col-md-4', 'card', 'p-3');
                 templateCard.innerHTML = `
-                    <h5 class="card-title">${template.name}</h5>
-                    <p class="card-text">${template.description}</p>
-                    <button class="btn btn-info"
-                `;
+                <h5 class="card-title">${template.name}</h5>
+                <p class="card-text">${template.description}</p>
+            `;
                 emailTemplatesContainer.appendChild(templateCard);
             });
         }
 
+        // Render campaigns
         function displayCampaigns(campaigns) {
             const campaignTableBody = document.querySelector('#campaignTable tbody');
             campaignTableBody.innerHTML = '';
+
             campaigns.forEach(campaign => {
                 const row = document.createElement('tr');
                 row.innerHTML = `
-                    <td>${campaign.name}</td>
-                    <td>${campaign.description}</td>
-                    <td>${campaign.startDate}</td>
-                    <td>${campaign.endDate}</td>
-                    <td>${campaign.status}</td>
-                    <td><button class="btn btn-success">Send</button></td>
-                `;
+                <td>${campaign.name}</td>
+                <td>${campaign.template.description}</td>
+                <td>${campaign.startDate} ${campaign.startTime}</td>
+                <td>${campaign.endDate || 'N/A'}</td>
+                <td>${campaign.status}</td>
+                <td><button class="btn btn-success">Send</button></td>
+            `;
                 campaignTableBody.appendChild(row);
             });
         }
 
+        // Socket Events
         socket.on('update_email_templates', (templates) => {
             emailTemplates = templates;
             displayEmailTemplates(templates);
@@ -139,6 +144,7 @@
             displayCampaigns(newCampaigns);
         });
 
+        // Create Email Template
         document.getElementById('createEmailTemplateForm').addEventListener('submit', (e) => {
             e.preventDefault();
             const name = document.getElementById('templateName').value;
@@ -152,9 +158,11 @@
                 category,
                 content
             });
+
             document.getElementById('createEmailTemplateForm').reset();
         });
 
+        // Create Campaign
         document.getElementById('createCampaignForm').addEventListener('submit', (e) => {
             e.preventDefault();
             const name = document.getElementById('campaignName').value;
@@ -180,11 +188,8 @@
 
             document.getElementById('createCampaignForm').reset();
         });
-
-        function selectTemplate(templateName) {
-            document.getElementById('templateSelector').value = templateName;
-        }
     </script>
+
 </body>
 
 </html>

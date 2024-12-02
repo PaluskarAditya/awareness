@@ -17,8 +17,8 @@ app.use(cors());
 
 let emailTemplates = []; // Stores email templates
 let connectedUsers = {}; // Tracks connected users
-let campaigns = []; // Store campaigns
-let userInbox = {}; // Store emails for each user
+let campaigns = []; // Stores campaigns
+let userInbox = {}; // Stores emails for each user
 
 // Handle Socket.IO connections
 io.on('connection', (socket) => {
@@ -27,10 +27,11 @@ io.on('connection', (socket) => {
     // Add connected user
     connectedUsers[socket.id] = { id: socket.id, name: `User-${socket.id.slice(0, 5)}` };
 
-    // Send the current email templates to the client
+    // Send current email templates and campaigns to the client
     socket.emit('update_email_templates', emailTemplates);
+    socket.emit('update_campaigns', campaigns);
 
-    // Send inbox to the user
+    // Handle inbox requests
     socket.on('request_inbox', () => {
         const inbox = userInbox[socket.id] || [];
         socket.emit('update_inbox', inbox);
@@ -38,41 +39,68 @@ io.on('connection', (socket) => {
 
     // Handle creating a new email template
     socket.on('create_email_template', (template) => {
+        if (!template.name || !template.content) {
+            console.error('Invalid template data:', template);
+            return;
+        }
+
+        console.log('Received new template:', template);
         emailTemplates.push(template);
-        io.emit('update_email_templates', emailTemplates); // Broadcast updated templates to all clients
+        io.emit('update_email_templates', emailTemplates); // Broadcast updated templates
     });
 
     // Handle creating a new campaign
     socket.on('create_campaign', (campaign) => {
-        // Prevent sending the same campaign twice
-        const existingCampaign = campaigns.find(existingCampaign => existingCampaign.name === campaign.name && existingCampaign.status === 'scheduled');
-        if (existingCampaign) return; // Prevent double sending of the same campaign
+        if (!campaign.name || !campaign.template) {
+            console.error('Invalid campaign data:', campaign);
+            return;
+        }
 
+        // Avoid duplicate campaigns
+        const existingCampaign = campaigns.find((c) => c.name === campaign.name && c.status === 'scheduled');
+        if (existingCampaign) {
+            console.log('Campaign already exists:', campaign.name);
+            return;
+        }
+
+        const emailTemplate = campaign.template;
+
+        if (!emailTemplates.find((t) => t.name === emailTemplate.name)) {
+            console.error('Template not found for campaign:', emailTemplate);
+            return;
+        }
+
+        console.log('Creating new campaign:', campaign);
         campaigns.push(campaign);
 
-        // Send the email to selected users or all users
+        const email = {
+            name: 'System',
+            from: 'no-reply@system.com',
+            to: campaign.recipient === 'all' ? 'All Users' : campaign.recipient,
+            subject: campaign.name,
+            body: emailTemplate.content,
+            timestamp: new Date().toISOString(),
+        };
+
+        // Send email to all or specific users
         if (campaign.recipient === 'all') {
             Object.keys(connectedUsers).forEach((userId) => {
-                if (!userInbox[userId]) userInbox[userId] = []; // Initialize inbox if it doesn't exist for the user
-                userInbox[userId].push({
-                    subject: campaign.name,
-                    body: campaign.template.content,
-                    timestamp: new Date().toISOString(),
-                });
+                if (!userInbox[userId]) userInbox[userId] = [];
+                userInbox[userId].push(email);
                 io.to(userId).emit('update_inbox', userInbox[userId]);
             });
         } else {
-            const recipientId = Object.keys(connectedUsers).find(userId => connectedUsers[userId].name === campaign.recipient);
-            if (!userInbox[recipientId]) userInbox[recipientId] = []; // Initialize inbox for the recipient
-            userInbox[recipientId].push({
-                subject: campaign.name,
-                body: campaign.template.content,
-                timestamp: new Date().toISOString(),
-            });
-            io.to(recipientId).emit('update_inbox', userInbox[recipientId]);
+            const recipientId = Object.keys(connectedUsers).find(
+                (userId) => connectedUsers[userId].name === campaign.recipient
+            );
+            if (recipientId) {
+                if (!userInbox[recipientId]) userInbox[recipientId] = [];
+                userInbox[recipientId].push(email);
+                io.to(recipientId).emit('update_inbox', userInbox[recipientId]);
+            }
         }
 
-        // Notify all connected clients about the new campaign
+        // Broadcast updated campaigns
         io.emit('update_campaigns', campaigns);
     });
 
